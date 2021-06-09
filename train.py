@@ -228,7 +228,7 @@ class Trainer:
 
                 # xxx ILTSS (distillation on features or logits)
                 if self.lde_flag:
-                    lde = self.lde_loss(features['body'], features_old['body'])
+                    lde = self.lde_loss(features, features_old)
 
                 if self.lkd_flag:
                     lkd = self.lkd_loss(outputs, outputs_old)
