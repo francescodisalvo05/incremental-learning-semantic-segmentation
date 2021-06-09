@@ -114,17 +114,17 @@ class Trainer:
 
                 loss = loss.mean()  # scalar
 
-                if self.icarl_combined:
-                    # tensor.narrow( dim, start, end) -> slice tensor from start to end in the specified dim
-                    n_cl_old = outputs_old.shape[1]
+                # if self.icarl_combined:
+                #    # tensor.narrow( dim, start, end) -> slice tensor from start to end in the specified dim
+                #    n_cl_old = outputs_old.shape[1]
                     # use n_cl_old to sum the contribution of each class, and not to average them (as done in our BCE).
-                    l_icarl = self.icarl * n_cl_old * self.licarl(outputs.narrow(1, 0, n_cl_old),
-                                                                  torch.sigmoid(outputs_old))
+                #    l_icarl = self.icarl * n_cl_old * self.licarl(outputs.narrow(1, 0, n_cl_old),
+                #                                                  torch.sigmoid(outputs_old))
 
                 # xxx ILTSS (distillation on features or logits)
                 # >> we can avoid that
-                if self.lde_flag:
-                    lde = self.lde * self.lde_loss(features, features_old)
+                # if self.lde_flag:
+                #    lde = self.lde * self.lde_loss(features, features_old)
 
                 # skip with default settings
                 if self.lkd_flag:
@@ -132,7 +132,7 @@ class Trainer:
                     lkd = self.lkd * self.lkd_loss(outputs, outputs_old)
 
                 # xxx first backprop of previous loss (compute the gradients for regularization methods)
-                loss_tot = loss + lkd + lde + l_icarl
+                loss_tot = loss + lkd # + lde + l_icarl
 
             scaler.scale(loss_tot).backward()
 
