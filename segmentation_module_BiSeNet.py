@@ -1,16 +1,11 @@
 import torch
 import torch.nn as nn
-from torch import distributed
+
 import torch.nn.functional as functional
 
-from functools import partial, reduce
+from functools import reduce
 
-import models
-from modules import build_contextpath
 from modules.build_BiSeNet import  BiSeNet
-
-from utils.logger import Logger
-
 
 def make_model(opts, classes=None):
     norm = nn.BatchNorm2d  # not synchronized, can be enabled with apex
@@ -72,14 +67,13 @@ class IncrementalSegmentationBiSeNet(nn.Module):
     def _network(self, x, ret_intermediate=False):
 
         # x_b = self.body(x)
-        x_pl, xc1, xc2 = self.head(x)
+        x_pl, _, _ = self.head(x)
 
         # maybe ..
         # x_pl, xc1, xc2 = self.head(x)
         # x_pl size = [4,1,8,8]
         # xc1 size = [4,1,4,4]
         # xc2 size = [4,1,4,4]
-
         out = []
 
         for mod in self.cls:
@@ -88,7 +82,9 @@ class IncrementalSegmentationBiSeNet(nn.Module):
         x_o = torch.cat(out, dim=1)
 
         if ret_intermediate:
-            return x_o, x_b,  x_pl
+            return x_o, x_pl
+
+
         return x_o
 
     def init_new_classifier(self, device):
@@ -116,9 +112,9 @@ class IncrementalSegmentationBiSeNet(nn.Module):
         sem_logits = functional.interpolate(sem_logits, size=out_size, mode="bilinear", align_corners=False)
 
         if ret_intermediate:
-            return sem_logits, {"body": out[1], "pre_logits": out[2]}
+            return sem_logits, out[1]
 
-        return sem_logits, {}
+        return sem_logits, None
 
     def fix_bn(self):
         for m in self.modules():
