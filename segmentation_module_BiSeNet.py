@@ -55,7 +55,7 @@ class IncrementalSegmentationBiSeNet(nn.Module):
         # c = number of classes for the current step
         # in_channels = ???
         self.cls = nn.ModuleList(
-            [nn.Conv2d(in_channels=c, out_channels=c, kernel_size=1) for c in classes]
+            [nn.Conv2d(in_channels=256, out_channels=c, kernel_size=1) for c in classes]
             # [nn.Conv2d(256, c, 1) for c in classes]
         )
 
