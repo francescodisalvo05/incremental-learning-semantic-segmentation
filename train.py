@@ -78,13 +78,12 @@ class Trainer:
         scaler = amp.GradScaler()
         model.train()
 
-
         for cur_step, (images, labels) in enumerate(train_loader):
 
             images = images.to(device, dtype=torch.float32)
             labels = labels.to(device, dtype=torch.long)
 
-            if (self.lde_flag or self.lkd_flag or self.icarl_dist_flag) and self.model_old is not None:
+            if (self.lde_flag or self.lkd_flag) and self.model_old is not None:
                 with torch.no_grad():
                     outputs_old, features_old = self.model_old(images, ret_intermediate=self.ret_intermediate)
 
