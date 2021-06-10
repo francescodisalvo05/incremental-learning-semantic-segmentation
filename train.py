@@ -33,6 +33,10 @@ class Trainer:
         else:
             self.criterion = nn.CrossEntropyLoss(ignore_index=255, reduction=reduction)
 
+        self.criterion_BiSeNet = nn.CrossEntropyLoss(ignore_index=255)
+
+
+
         # ILTSS
         self.lde = opts.loss_de
         self.lde_flag = self.lde > 0. and model_old is not None
@@ -44,19 +48,6 @@ class Trainer:
             self.lkd_loss = UnbiasedKnowledgeDistillationLoss(alpha=opts.alpha)
         else:
             self.lkd_loss = KnowledgeDistillationLoss(alpha=opts.alpha)
-
-        # ICARL
-        self.icarl_combined = False
-        self.icarl_only_dist = False
-        if opts.icarl:
-            self.icarl_combined = not opts.icarl_disjoint and model_old is not None
-            self.icarl_only_dist = opts.icarl_disjoint and model_old is not None
-            if self.icarl_combined:
-                self.licarl = nn.BCEWithLogitsLoss(reduction='mean')
-                self.icarl = opts.icarl_importance
-            elif self.icarl_only_dist:
-                self.licarl = IcarlLoss(reduction='mean', bkg=opts.icarl_bkg)
-        self.icarl_dist_flag = self.icarl_only_dist or self.icarl_combined
 
         # Regularization
         regularizer_state = trainer_state['regularizer'] if trainer_state is not None else None
@@ -102,19 +93,22 @@ class Trainer:
 
                 # output = concatenated output
                 # features = x_pl (Feature Fusion output)
-                outputs, features = model(images, ret_intermediate=self.ret_intermediate)
+                outputs, cx1_sup, cx2_sup = model(images, ret_intermediate=self.ret_intermediate)
 
                 # xxx BCE / Cross Entropy Loss
                 # icarl_only_dist = False
                 if not self.icarl_only_dist:
                     # criterion = nn.CrossEntropyLoss(ignore_index=255, reduction=reduction)
                     loss = criterion(outputs, labels)  # B x H x W
-                else:
-                    loss = self.licarl(outputs, labels, torch.sigmoid(outputs_old))
 
                 loss = loss.mean()  # scalar
 
+                loss2 = self.criterion_BiSeNet(cx1_sup, labels)
+                loss3 = self.criterion_BiSeNet(cx2_sup, labels)
+
                 # xxx ILTSS (distillation on features or logits)
+
+                # SCELTA PROGETTUALE SUGLI INPUT DELLE LOSS
                 if self.lde_flag:
                     lde = self.lde * self.lde_loss(features, features_old)
 
