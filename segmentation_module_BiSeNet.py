@@ -8,10 +8,9 @@ from functools import reduce
 from modules.build_BiSeNet import  BiSeNet
 
 def make_model(opts, classes=None):
-    norm = nn.BatchNorm2d  # not synchronized, can be enabled with apex
 
-    # body = models.__dict__[f'net_{opts.backbone}'](norm_act=norm, output_stride=opts.output_stride)
-    body = opts.backbone # 'resnet50'
+    # string with the backbone e.g. 'resnet'
+    body = opts.backbone
 
     if not opts.no_pretrained:
         pretrained_path = f'pretrained/{opts.backbone}_{opts.norm_act}.pth.tar'
@@ -48,24 +47,19 @@ class IncrementalSegmentationBiSeNet(nn.Module):
         self.body = body
         self.head = head
 
-        # classes must be a list where [n_class_task[i] for i in tasks]
         assert isinstance(classes, list), \
             "Classes must be a list where to every index correspond the num of classes for that task"
 
-        # c = number of classes for the current step
-        #if body == 'resnet101':
+        # classifiers supervision 1
+        self.supervision1 = nn.ModuleList(
+            [nn.Conv2d(in_channels=1024, out_channels=c, kernel_size=1) for c in classes]
+        )
+        # classifiers supervision 2
+        self.supervision2 = nn.ModuleList(
+            [nn.Conv2d(in_channels=2048, out_channels=c, kernel_size=1) for c in classes]
+        )
 
-
-        if body == 'resnet50':
-            self.supervision1 = nn.ModuleList(
-                [nn.Conv2d(in_channels=1024, out_channels=c, kernel_size=1) for c in classes]
-            )
-            self.supervision2 = nn.ModuleList(
-                [nn.Conv2d(in_channels=2048, out_channels=c, kernel_size=1) for c in classes]
-            )
-
-        #elif body == 'resnet18':
-
+        # classifiers for the final layers
         self.cls = nn.ModuleList(
             [nn.Conv2d(in_channels=256, out_channels=c, kernel_size=1) for c in classes]
             # [nn.Conv2d(256, c, 1) for c in classes]
@@ -86,18 +80,17 @@ class IncrementalSegmentationBiSeNet(nn.Module):
         for mod in self.cls:
             out.append(mod(result))
 
-        x_o = torch.cat(out, dim=1)
-
         for mod in self.supervision1:
             cx1_out.append(mod(cx1))
-
-        cx1_sup = torch.cat(cx1_out, dim=1)
 
         for mod in self.supervision2:
             cx2_out.append(mod(cx2))
 
+        x_o = torch.cat(out, dim=1)
+        cx1_sup = torch.cat(cx1_out, dim=1)
         cx2_sup = torch.cat(cx2_out, dim=1)
 
+        # it is forced to True at the moment
         if ret_intermediate:
             return x_o, cx1_sup, cx2_sup
 
@@ -121,18 +114,14 @@ class IncrementalSegmentationBiSeNet(nn.Module):
     def forward(self, x, scales=None, do_flip=False, ret_intermediate=False):
         out_size = x.shape[-2:]
 
-        out = self._network(x, ret_intermediate)
-
-        sem_logits = out[0] if ret_intermediate else out
-
-        sem_logits = functional.interpolate(sem_logits, size=out_size, mode="bilinear", align_corners=False)
-
         if ret_intermediate:
-            out_1 = torch.nn.functional.interpolate(out[1], size=out_size, mode='bilinear', align_corners=False)
-            out_2 = torch.nn.functional.interpolate(out[2], size=out_size, mode='bilinear', align_corners=False)
-            return sem_logits, out_1, out_2
+            out, out_cx1, out_cx2 = self._network(x, ret_intermediate)
+            out = functional.interpolate(out, size=out_size, mode="bilinear", align_corners=False)
+            out_1 = functional.interpolate(out_cx1, size=out_size, mode='bilinear', align_corners=False)
+            out_2 = functional.interpolate(out_cx2, size=out_size, mode='bilinear', align_corners=False)
+            return out, out_1, out_2
 
-        return sem_logits
+        return functional.interpolate(self._network(x, ret_intermediate), size=out_size, mode="bilinear", align_corners=False)
 
     def fix_bn(self):
         for m in self.modules():
