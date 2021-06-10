@@ -116,7 +116,8 @@ class IncrementalSegmentationBiSeNet(nn.Module):
 
         if ret_intermediate:
             out, out_cx1, out_cx2 = self._network(x, ret_intermediate)
-            out = functional.interpolate(out, size=out_size, mode="bilinear", align_corners=False)
+            # scale factor requested for BiSeNet
+            out = functional.interpolate(out, scale_factor=8, size=out_size, mode="bilinear", align_corners=False)
             out_1 = functional.interpolate(out_cx1, size=out_size, mode='bilinear', align_corners=False)
             out_2 = functional.interpolate(out_cx2, size=out_size, mode='bilinear', align_corners=False)
             return out, out_1, out_2
