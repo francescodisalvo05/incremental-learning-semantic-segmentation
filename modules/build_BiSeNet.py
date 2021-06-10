@@ -79,7 +79,7 @@ class FeatureFusionModule(torch.nn.Module):
 
 
 class BiSeNet(torch.nn.Module):
-    def __init__(self, num_classes, context_path):
+    def __init__(self, context_path):
         super().__init__()
         # build spatial path
         self.saptial_path = Spatial_path()
@@ -92,8 +92,8 @@ class BiSeNet(torch.nn.Module):
             self.attention_refinement_module1 = AttentionRefinementModule(1024, 1024)
             self.attention_refinement_module2 = AttentionRefinementModule(2048, 2048)
             # supervision block
-            self.supervision1 = nn.Conv2d(in_channels=1024, out_channels=256, kernel_size=1)
-            self.supervision2 = nn.Conv2d(in_channels=2048, out_channels=256, kernel_size=1)
+            #self.supervision1 = nn.Conv2d(in_channels=1024, out_channels=num_classes, kernel_size=1)
+            #self.supervision2 = nn.Conv2d(in_channels=2048, out_channels=num_classes, kernel_size=1)
             # build feature fusion module
             self.feature_fusion_module = FeatureFusionModule(256, 3328)
 
@@ -102,8 +102,8 @@ class BiSeNet(torch.nn.Module):
             self.attention_refinement_module1 = AttentionRefinementModule(256, 256)
             self.attention_refinement_module2 = AttentionRefinementModule(512, 512)
             # supervision block
-            self.supervision1 = nn.Conv2d(in_channels=256, out_channels=256, kernel_size=1)
-            self.supervision2 = nn.Conv2d(in_channels=512, out_channels=256, kernel_size=1)
+            #self.supervision1 = nn.Conv2d(in_channels=256, out_channels=num_classes, kernel_size=1)
+            #self.supervision2 = nn.Conv2d(in_channels=512, out_channels=num_classes, kernel_size=1)
             # build feature fusion module
             self.feature_fusion_module = FeatureFusionModule(256, 1024)
 
@@ -112,8 +112,8 @@ class BiSeNet(torch.nn.Module):
             self.attention_refinement_module1 = AttentionRefinementModule(1024, 1024)
             self.attention_refinement_module2 = AttentionRefinementModule(2048, 2048)
             # supervision block
-            self.supervision1 = nn.Conv2d(in_channels=1024, out_channels=256, kernel_size=1)
-            self.supervision2 = nn.Conv2d(in_channels=2048, out_channels=256, kernel_size=1)
+            #self.supervision1 = nn.Conv2d(in_channels=1024, out_channels=num_classes, kernel_size=1)
+            #self.supervision2 = nn.Conv2d(in_channels=2048, out_channels=num_classes, kernel_size=1)
             # build feature fusion module
             self.feature_fusion_module = FeatureFusionModule(256, 3328)
 
@@ -159,11 +159,10 @@ class BiSeNet(torch.nn.Module):
         cx2 = torch.nn.functional.interpolate(cx2, size=sx.size()[-2:], mode='bilinear')
         cx = torch.cat((cx1, cx2), dim=1)
 
-        if self.training == True:
+        """if self.training == True:
             cx1_sup = self.supervision1(cx1)
             cx2_sup = self.supervision2(cx2)
-            cx1_sup = torch.nn.functional.interpolate(cx1_sup, size=input.size()[-2:], mode='bilinear')
-            cx2_sup = torch.nn.functional.interpolate(cx2_sup, size=input.size()[-2:], mode='bilinear')
+        """
 
         # output of feature fusion module
         result = self.feature_fusion_module(sx, cx)
@@ -174,7 +173,7 @@ class BiSeNet(torch.nn.Module):
         # result = self.conv(result)
 
         if self.training == True:
-            return result, cx1_sup, cx2_sup
+            return result, cx1, cx2
 
         return result
 

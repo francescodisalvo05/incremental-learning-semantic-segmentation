@@ -22,7 +22,7 @@ def make_model(opts, classes=None):
         body.load_state_dict(pre_dict['state_dict'])
         del pre_dict  # free memory
 
-    head = BiSeNet(classes, body)
+    head = BiSeNet(body)
 
     if classes is not None:
         model = IncrementalSegmentationBiSeNet(body, head, classes=classes, fusion_mode=opts.fusion_mode)
@@ -53,6 +53,19 @@ class IncrementalSegmentationBiSeNet(nn.Module):
             "Classes must be a list where to every index correspond the num of classes for that task"
 
         # c = number of classes for the current step
+        #if body == 'resnet101':
+
+
+        if body == 'resnet50':
+            self.supervision1 = nn.ModuleList(
+                [nn.Conv2d(in_channels=1024, out_channels=c, kernel_size=1) for c in classes]
+            )
+            self.supervision2 = nn.ModuleList(
+                [nn.Conv2d(in_channels=2048, out_channels=c, kernel_size=1) for c in classes]
+            )
+
+        #elif body == 'resnet18':
+
         self.cls = nn.ModuleList(
             [nn.Conv2d(in_channels=256, out_channels=c, kernel_size=1) for c in classes]
             # [nn.Conv2d(256, c, 1) for c in classes]
@@ -65,24 +78,28 @@ class IncrementalSegmentationBiSeNet(nn.Module):
 
     def _network(self, x, ret_intermediate=False):
 
-        # x_b = self.body(x)
-        x_pl, _, _ = self.head(x)
-
-        # maybe ..
-        # x_pl, xc1, xc2 = self.head(x)
-        # x_pl size = [4,1,8,8]
-        # xc1 size = [4,1,4,4]
-        # xc2 size = [4,1,4,4]
+        result, cx1, cx2 = self.head(x)
         out = []
+        cx1_out = []
+        cx2_out = []
 
         for mod in self.cls:
-            out.append(mod(x_pl))
+            out.append(mod(result))
 
         x_o = torch.cat(out, dim=1)
 
-        if ret_intermediate:
-            return x_o, x_pl
+        for mod in self.supervision1:
+            cx1_out.append(mod(cx1))
 
+        cx1_sup = torch.cat(cx1_out, dim=1)
+
+        for mod in self.supervision2:
+            cx2_out.append(mod(cx2))
+
+        cx2_sup = torch.cat(cx2_out, dim=1)
+
+        if ret_intermediate:
+            return x_o, cx1_sup, cx2_sup
 
         return x_o
 
@@ -111,7 +128,9 @@ class IncrementalSegmentationBiSeNet(nn.Module):
         sem_logits = functional.interpolate(sem_logits, size=out_size, mode="bilinear", align_corners=False)
 
         if ret_intermediate:
-            return sem_logits, out[1]
+            out[1] = torch.nn.functional.interpolate(out[1], size=input.size()[-2:], mode='bilinear')
+            out[2] = torch.nn.functional.interpolate(out[2], size=input.size()[-2:], mode='bilinear')
+            return sem_logits, out[1], out[2]
 
         return sem_logits
 
