@@ -15,6 +15,8 @@ class Trainer:
         self.model = model
         self.device = device
 
+        self.scaler = amp.GradScaler()
+
         if classes is not None:
             new_classes = classes[-1]
             tot_classes = reduce(lambda a, b: a + b, classes)
@@ -73,9 +75,6 @@ class Trainer:
         l_icarl = torch.tensor(0.)
         l_reg = torch.tensor(0.)
 
-        # train_loader.sampler.set_epoch(cur_epoch)
-
-        scaler = amp.GradScaler()
         model.train()
 
         for cur_step, (images, labels) in enumerate(train_loader):
@@ -83,33 +82,33 @@ class Trainer:
             images = images.to(device, dtype=torch.float32)
             labels = labels.to(device, dtype=torch.long)
 
-            if (self.lde_flag or self.lkd_flag) and self.model_old is not None:
-                with torch.no_grad():
-                    outputs_old, features_old = self.model_old(images, ret_intermediate=self.ret_intermediate)
-
-            optim.zero_grad()
             with amp.autocast():
+                if (self.lde_flag or self.lkd_flag) and self.model_old is not None:
+                    with torch.no_grad():
+                        outputs_old, cx1_sup_old, cx2_sup_old = self.model_old(images, ret_intermediate=self.ret_intermediate)
+
+                optim.zero_grad()
 
                 # output = concatenated output
                 # features = x_pl (Feature Fusion output)
                 outputs, cx1_sup, cx2_sup = model(images, ret_intermediate=self.ret_intermediate)
 
                 # xxx BCE / Cross Entropy Loss
-                self.icarl_only_dist = False
+                # self.icarl_only_dist = False
                 if not self.icarl_only_dist:
                     # criterion = nn.CrossEntropyLoss(ignore_index=255, reduction=reduction)
                     loss = criterion(outputs, labels)  # B x H x W
 
-                loss = loss.mean()  # scalar
+                # loss = loss.mean()  # scalar
 
-                loss2 = self.criterion_BiSeNet(cx1_sup, labels)
-                loss3 = self.criterion_BiSeNet(cx2_sup, labels)
+                loss1 = self.criterion_BiSeNet(cx1_sup, labels)
+                loss2 = self.criterion_BiSeNet(cx2_sup, labels)
 
                 # xxx ILTSS (distillation on features or logits)
 
                 # SCELTA PROGETTUALE SUGLI INPUT DELLE LOSS
-                if self.lde_flag:
-                    lde = self.lde * self.lde_loss(features, features_old)
+                """if self.lde_flag:
+                    lde = self.lde * self.lde_loss(features, features_old)"""
 
                 # skip with default settings
                 if self.lkd_flag:
@@ -117,17 +116,15 @@ class Trainer:
                     lkd = self.lkd * self.lkd_loss(outputs, outputs_old)
 
                 # xxx first backprop of previous loss (compute the gradients for regularization methods)
-                loss_tot = loss + lkd # + lde + l_icarl
+                loss_tot = loss + loss1 + loss2 # lkd + + lde + l_icarl
+                loss_tot = loss_tot.mean()
 
-            scaler.scale(loss_tot).backward()
-
-
-            scaler.step(optim)
-            scaler.update()
+            self.scaler.scale(loss_tot).backward()
+            self.scaler.step(optim)
+            self.scaler.update()
 
             if scheduler is not None:
                 scheduler.step()
-
 
             epoch_loss += loss.item()
             reg_loss += l_reg.item() if l_reg != 0. else 0.
@@ -146,9 +143,8 @@ class Trainer:
                     logger.add_scalar('Loss', interval_loss, x)
                 interval_loss = 0.0
 
-        # collect statistics from multiple processes
-        epoch_loss = torch.tensor(epoch_loss).to(self.device)
-        reg_loss = torch.tensor(reg_loss).to(self.device)
+        epoch_loss /= len(train_loader)
+        reg_loss /= len(train_loader)
 
         logger.info(f"Epoch {cur_epoch}, Class Loss={epoch_loss}, Reg Loss={reg_loss}")
 
