@@ -94,7 +94,7 @@ class Trainer:
                 outputs, cx1_sup, cx2_sup = model(images, ret_intermediate=self.ret_intermediate)
 
                 # xxx BCE / Cross Entropy Loss
-                # self.icarl_only_dist = False
+                self.icarl_only_dist = False
                 if not self.icarl_only_dist:
                     # criterion = nn.CrossEntropyLoss(ignore_index=255, reduction=reduction)
                     loss = criterion(outputs, labels)  # B x H x W
@@ -126,11 +126,13 @@ class Trainer:
             if scheduler is not None:
                 scheduler.step()
 
+            loss = loss.mean()
+
             epoch_loss += loss.item()
-            reg_loss += l_reg.item() if l_reg != 0. else 0.
-            reg_loss += lkd.item() + lde.item() + l_icarl.item()
-            interval_loss += loss.item() + lkd.item() + lde.item() + l_icarl.item()
-            interval_loss += l_reg.item() if l_reg != 0. else 0.
+            # reg_loss += l_reg.item() if l_reg != 0. else 0.
+            # reg_loss += lkd.item() + lde.item() + l_icarl.item()
+            interval_loss += loss.item() # + lkd.item() + lde.item() + l_icarl.item()
+            # interval_loss += l_reg.item() if l_reg != 0. else 0.
 
             if (cur_step + 1) % print_int == 0:
                 interval_loss = interval_loss / print_int
