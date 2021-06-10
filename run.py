@@ -133,9 +133,9 @@ def main(opts):
 
     #####################################################################################
     train_loader = data.DataLoader(train_dst, batch_size=opts.batch_size,
-                                   num_workers=opts.num_workers, drop_last=True)
+                                   shuffle=True, num_workers=opts.num_workers, drop_last=True)
     val_loader = data.DataLoader(val_dst, batch_size=opts.batch_size if opts.crop_val else 1,
-                                   num_workers=opts.num_workers)
+                                 shuffle=True, num_workers=opts.num_workers)
     #####################################################################################
 
     logger.info(f"Dataset: {opts.dataset}, Train set: {len(train_dst)}, Val set: {len(val_dst)},"
@@ -335,14 +335,13 @@ def main(opts):
                   model, trainer, optimizer, scheduler, cur_epoch, best_score)
         logger.info("[!] Checkpoint saved.")
 
-    torch.distributed.barrier()
+    torch.barrier()
 
     # xxx From here starts the test code
     logger.info("*** Test the model on all seen classes...")
     # make data loader
     test_loader = data.DataLoader(test_dst, batch_size=opts.batch_size if opts.crop_val else 1,
-                                  sampler=DistributedSampler(test_dst, num_replicas=world_size, rank=rank),
-                                  num_workers=opts.num_workers)
+                                  shuffle=True, num_workers=opts.num_workers)
 
     # load best model
     if TRAIN:

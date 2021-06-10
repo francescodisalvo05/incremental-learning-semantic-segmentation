@@ -171,8 +171,8 @@ class Trainer:
         epoch_loss = torch.tensor(epoch_loss).to(self.device)
         reg_loss = torch.tensor(reg_loss).to(self.device)
 
-        torch.distributed.reduce(epoch_loss, dst=0)
-        torch.distributed.reduce(reg_loss, dst=0)
+        torch.reduce(epoch_loss, dst=0)
+        torch.reduce(reg_loss, dst=0)
 
         """if distributed.get_rank() == 0:
             epoch_loss = epoch_loss / distributed.get_world_size() / len(train_loader)
@@ -259,8 +259,8 @@ class Trainer:
             class_loss = torch.tensor(class_loss).to(self.device)
             reg_loss = torch.tensor(reg_loss).to(self.device)
 
-            torch.distributed.reduce(class_loss, dst=0)
-            torch.distributed.reduce(reg_loss, dst=0)
+            torch.reduce(class_loss, dst=0)
+            torch.reduce(reg_loss, dst=0)
 
             """if distributed.get_rank() == 0:
                 class_loss = class_loss / distributed.get_world_size() / len(loader)
