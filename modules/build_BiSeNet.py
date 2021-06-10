@@ -157,23 +157,10 @@ class BiSeNet(torch.nn.Module):
         cx2 = torch.nn.functional.interpolate(cx2, size=sx.size()[-2:], mode='bilinear')
         cx = torch.cat((cx1, cx2), dim=1)
 
-        """if self.training == True:
-            cx1_sup = self.supervision1(cx1)
-            cx2_sup = self.supervision2(cx2)
-        """
-
         # output of feature fusion module
         result = self.feature_fusion_module(sx, cx)
 
-        # upsampling
-        result = torch.nn.functional.interpolate(result, scale_factor=8, mode='bilinear')
-
-        # result = self.conv(result)
-
-        if self.training == True:
-            return result, cx1, cx2
-
-        return result
+        return result, cx1, cx2
 
 
 if __name__ == '__main__':
