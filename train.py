@@ -114,17 +114,9 @@ class Trainer:
 
                 loss = loss.mean()  # scalar
 
-                # if self.icarl_combined:
-                #    # tensor.narrow( dim, start, end) -> slice tensor from start to end in the specified dim
-                #    n_cl_old = outputs_old.shape[1]
-                    # use n_cl_old to sum the contribution of each class, and not to average them (as done in our BCE).
-                #    l_icarl = self.icarl * n_cl_old * self.licarl(outputs.narrow(1, 0, n_cl_old),
-                #                                                  torch.sigmoid(outputs_old))
-
                 # xxx ILTSS (distillation on features or logits)
-                # >> we can avoid that
-                # if self.lde_flag:
-                #    lde = self.lde * self.lde_loss(features, features_old)
+                if self.lde_flag:
+                    lde = self.lde * self.lde_loss(features, features_old)
 
                 # skip with default settings
                 if self.lkd_flag:
@@ -136,12 +128,6 @@ class Trainer:
 
             scaler.scale(loss_tot).backward()
 
-            # xxx Regularizer (EWC, RW, PI)
-            if self.regularizer_flag:
-                self.regularizer.update()
-                l_reg = self.reg_importance * self.regularizer.penalty()
-                if l_reg != 0.:
-                    scaler.scale(l_reg).backward()
 
             scaler.step(optim)
             scaler.update()
@@ -170,14 +156,6 @@ class Trainer:
         # collect statistics from multiple processes
         epoch_loss = torch.tensor(epoch_loss).to(self.device)
         reg_loss = torch.tensor(reg_loss).to(self.device)
-
-        torch.reduce(epoch_loss, dst=0)
-        torch.reduce(reg_loss, dst=0)
-
-        """if distributed.get_rank() == 0:
-            epoch_loss = epoch_loss / distributed.get_world_size() / len(train_loader)
-            reg_loss = reg_loss / distributed.get_world_size() / len(train_loader)
-        """
 
         logger.info(f"Epoch {cur_epoch}, Class Loss={epoch_loss}, Reg Loss={reg_loss}")
 
@@ -259,13 +237,7 @@ class Trainer:
             class_loss = torch.tensor(class_loss).to(self.device)
             reg_loss = torch.tensor(reg_loss).to(self.device)
 
-            torch.reduce(class_loss, dst=0)
-            torch.reduce(reg_loss, dst=0)
 
-            """if distributed.get_rank() == 0:
-                class_loss = class_loss / distributed.get_world_size() / len(loader)
-                reg_loss = reg_loss / distributed.get_world_size() / len(loader)
-            """
             if logger is not None:
                 logger.info(f"Validation, Class Loss={class_loss}, Reg Loss={reg_loss} (without scaling)")
 
