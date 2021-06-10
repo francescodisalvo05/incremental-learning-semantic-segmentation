@@ -174,9 +174,9 @@ class Trainer:
                 images = images.to(device, dtype=torch.float32)
                 labels = labels.to(device, dtype=torch.long)
 
-                if (self.lde_flag or self.lkd_flag or self.icarl_dist_flag) and self.model_old is not None:
+                if (self.lde_flag or self.lkd_flag) and self.model_old is not None:
                     with torch.no_grad():
-                        outputs_old, features_old = self.model_old(images, ret_intermediate=True)
+                        outputs_old = self.model_old(images, ret_intermediate=True)
 
                 outputs, cx1_sup, cx2_sup = model(images, ret_intermediate=True)
 
