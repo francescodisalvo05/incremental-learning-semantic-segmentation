@@ -55,7 +55,7 @@ class Trainer:
         self.regularizer_flag = self.regularizer is not None
         self.reg_importance = opts.reg_importance
 
-        self.ret_intermediate = self.lde
+        self.ret_intermediate = True
 
     def train(self, cur_epoch, optim, train_loader, scheduler=None, print_int=10, logger=None):
         """Train and return epoch loss"""
@@ -95,7 +95,7 @@ class Trainer:
                 outputs, cx1_sup, cx2_sup = model(images, ret_intermediate=self.ret_intermediate)
 
                 # xxx BCE / Cross Entropy Loss
-                # icarl_only_dist = False
+                self.icarl_only_dist = False
                 if not self.icarl_only_dist:
                     # criterion = nn.CrossEntropyLoss(ignore_index=255, reduction=reduction)
                     loss = criterion(outputs, labels)  # B x H x W
