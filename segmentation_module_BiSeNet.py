@@ -128,8 +128,8 @@ class IncrementalSegmentationBiSeNet(nn.Module):
         sem_logits = functional.interpolate(sem_logits, size=out_size, mode="bilinear", align_corners=False)
 
         if ret_intermediate:
-            out[1] = torch.nn.functional.interpolate(out[1], size=input.size()[-2:], mode='bilinear')
-            out[2] = torch.nn.functional.interpolate(out[2], size=input.size()[-2:], mode='bilinear')
+            out[1] = torch.nn.functional.interpolate(out[1], size=out_size, mode='bilinear')
+            out[2] = torch.nn.functional.interpolate(out[2], size=out_size, mode='bilinear')
             return sem_logits, out[1], out[2]
 
         return sem_logits
