@@ -181,7 +181,7 @@ class Trainer:
                     with torch.no_grad():
                         outputs_old, features_old = self.model_old(images, ret_intermediate=True)
 
-                outputs, features = model(images, ret_intermediate=True)
+                outputs, cx1_sup, cx2_sup = model(images, ret_intermediate=True)
 
                 # xxx BCE / Cross Entropy Loss
                 if not self.icarl_only_dist:
@@ -191,14 +191,8 @@ class Trainer:
 
                 loss = loss.mean()  # scalar
 
-                if self.icarl_combined:
-                    # tensor.narrow( dim, start, end) -> slice tensor from start to end in the specified dim
-                    n_cl_old = outputs_old.shape[1]
-                    # use n_cl_old to sum the contribution of each class, and not to average them (as done in our BCE).
-                    l_icarl = self.icarl * n_cl_old * self.licarl(outputs.narrow(1, 0, n_cl_old),
-                                                                  torch.sigmoid(outputs_old))
-
                 # xxx ILTSS (distillation on features or logits)
+                # loss calcolate su cx1, cx2 ?? ? ?? ? ? 
                 if self.lde_flag:
                     lde = self.lde_loss(features, features_old)
 
