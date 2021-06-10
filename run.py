@@ -106,7 +106,7 @@ def main(opts):
     """distributed.init_process_group(backend='nccl', init_method='env://')
     device_id, device = opts.local_rank, torch.device(opts.local_rank)
     rank, world_size = distributed.get_rank(), distributed.get_world_size()"""
-    # device = torch.device("gpu") if torch.cuda.is_available() else torch.device("cpu")
+
     rank = 0
     world_size = None
 
@@ -160,15 +160,15 @@ def main(opts):
     logger.debug(model)
 
     # xxx Set up optimizer
+    """
     params = []
-
     params.append({"params": filter(lambda p: p.requires_grad, model.head.parameters()),
                    'weight_decay': opts.weight_decay})
 
     params.append({"params": filter(lambda p: p.requires_grad, model.cls.parameters()),
                    'weight_decay': opts.weight_decay})
-
-    optimizer = torch.optim.SGD(params, lr=opts.lr, momentum=0.9, nesterov=True)
+    """
+    optimizer = torch.optim.SGD(model.parameters(), lr=opts.lr, momentum=0.9, nesterov=True)
 
     if opts.lr_policy == 'poly':
         scheduler = utils.PolyLR(optimizer, max_iters=opts.epochs * len(train_loader), power=opts.lr_power)
