@@ -11,7 +11,7 @@ def make_model(opts, classes=None):
     norm = nn.BatchNorm2d  # not synchronized, can be enabled with apex
 
     # body = models.__dict__[f'net_{opts.backbone}'](norm_act=norm, output_stride=opts.output_stride)
-    body = opts.backbone
+    body = opts.backbone # 'resnet50'
 
     if not opts.no_pretrained:
         pretrained_path = f'pretrained/{opts.backbone}_{opts.norm_act}.pth.tar'
@@ -22,7 +22,7 @@ def make_model(opts, classes=None):
         body.load_state_dict(pre_dict['state_dict'])
         del pre_dict  # free memory
 
-    head = BiSeNet(len(classes), body)
+    head = BiSeNet(classes, body)
 
     if classes is not None:
         model = IncrementalSegmentationBiSeNet(body, head, classes=classes, fusion_mode=opts.fusion_mode)
@@ -45,15 +45,14 @@ class IncrementalSegmentationBiSeNet(nn.Module):
     def __init__(self, body, head, classes, ncm=False, fusion_mode="mean"):
         super(IncrementalSegmentationBiSeNet, self).__init__()
 
-        self.body = body ###
-        self.head = head ###
+        self.body = body
+        self.head = head
 
         # classes must be a list where [n_class_task[i] for i in tasks]
         assert isinstance(classes, list), \
             "Classes must be a list where to every index correspond the num of classes for that task"
 
         # c = number of classes for the current step
-        # in_channels = ???
         self.cls = nn.ModuleList(
             [nn.Conv2d(in_channels=256, out_channels=c, kernel_size=1) for c in classes]
             # [nn.Conv2d(256, c, 1) for c in classes]
@@ -114,7 +113,7 @@ class IncrementalSegmentationBiSeNet(nn.Module):
         if ret_intermediate:
             return sem_logits, out[1]
 
-        return sem_logits, None
+        return sem_logits
 
     def fix_bn(self):
         for m in self.modules():
