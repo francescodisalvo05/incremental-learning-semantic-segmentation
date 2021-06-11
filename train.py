@@ -216,7 +216,7 @@ class Trainer:
                                         prediction[0]))
 
             # collect statistics from multiple processes
-            metrics.synch(device)
+            # metrics.synch(device)
             score = metrics.get_results()
 
             class_loss = torch.tensor(class_loss).to(self.device)
