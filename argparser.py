@@ -191,7 +191,7 @@ def get_argparser():
                         help="The incremental step in execution (default: 0)")
     parser.add_argument("--no_mask", action='store_true', default=False,
                         help="Use this to not mask the old classes in new training set")
-    parser.add_argument("--overlap", action='store_true', default=False,
+    parser.add_argument("--overlap", action='store_true', default=True,
                         help="Use this to not use the new classes in the old training set")
     parser.add_argument("--step_ckpt", default=None, type=str,
                         help="path to trained model at previous step. Leave it None if you want to use def path")
