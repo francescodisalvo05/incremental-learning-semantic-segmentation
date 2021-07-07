@@ -181,10 +181,10 @@ class Trainer:
                 outputs, cx1_sup, cx2_sup = model(images, ret_intermediate=True)
 
                 # xxx BCE / Cross Entropy Loss
-                if not self.icarl_only_dist:
-                    loss = criterion(outputs, labels)  # B x H x W
-                else:
-                    loss = self.licarl(outputs, labels, torch.sigmoid(outputs_old))
+                #if not self.icarl_only_dist:
+                loss = criterion(outputs, labels)  # B x H x W
+                #else:
+                #    loss = self.licarl(outputs, labels, torch.sigmoid(outputs_old))
 
                 loss = loss.mean()  # scalar
 
