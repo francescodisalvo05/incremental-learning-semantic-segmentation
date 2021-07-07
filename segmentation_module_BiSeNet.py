@@ -61,12 +61,12 @@ class IncrementalSegmentationBiSeNet(nn.Module):
 
         # classifiers for the final layers
         self.cls = nn.ModuleList(
-            [nn.Conv2d(in_channels=128, out_channels=c, kernel_size=1) for c in classes]
+            [nn.Conv2d(in_channels=256, out_channels=c, kernel_size=1) for c in classes]
             # [nn.Conv2d(256, c, 1) for c in classes]
         )
 
         self.classes = classes
-        # self.head_channels = 256
+        self.head_channels = 256
         self.tot_classes = reduce(lambda a, b: a + b, self.classes)
         self.means = None
 
