@@ -336,8 +336,6 @@ def main(opts):
                   model, trainer, optimizer, scheduler, cur_epoch, best_score)
         logger.info("[!] Checkpoint saved.")
 
-    torch.barrier()
-
     # xxx From here starts the test code
     logger.info("*** Test the model on all seen classes...")
     # make data loader
