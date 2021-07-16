@@ -72,19 +72,20 @@ class IncrementalSegmentationBiSeNet(nn.Module):
 
     def _network(self, x, ret_intermediate=False):
 
-        result, cx1, cx2 = self.head(x)
+        features, features_cx1, features_cx2 = self.head(x)
+        self.features = features
         out = []
         cx1_out = []
         cx2_out = []
 
         for mod in self.cls:
-            out.append(mod(result))
+            out.append(mod(features))
 
         for mod in self.supervision1:
-            cx1_out.append(mod(cx1))
+            cx1_out.append(mod(features_cx1))
 
         for mod in self.supervision2:
-            cx2_out.append(mod(cx2))
+            cx2_out.append(mod(features_cx2))
 
         x_o = torch.cat(out, dim=1)
         cx1_sup = torch.cat(cx1_out, dim=1)

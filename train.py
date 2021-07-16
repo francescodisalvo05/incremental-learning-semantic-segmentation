@@ -87,30 +87,30 @@ class Trainer:
                 if (self.lde_flag or self.lkd_flag) and self.model_old is not None:
                     with torch.no_grad():
                         outputs_old = self.model_old(images, ret_intermediate=False)
-
+                        features_old = self.model_old.features
                 optim.zero_grad()
 
                 # output = concatenated output
                 # features = x_pl (Feature Fusion output)
                 outputs, cx1_sup, cx2_sup = model(images, ret_intermediate=self.ret_intermediate)
-
+                features = self.model.features
                 # xxx BCE / Cross Entropy Loss
                 self.icarl_only_dist = False
                 if not self.icarl_only_dist:
                     # criterion = nn.CrossEntropyLoss(ignore_index=255, reduction=reduction)
                     loss = criterion(outputs, labels)  # B x H x W
+                    loss1 = self.criterion_BiSeNet(cx1_sup, labels)
+                    loss2 = self.criterion_BiSeNet(cx2_sup, labels)
 
                 # loss = loss.mean()  # scalar
 
-                loss1 = self.criterion_BiSeNet(cx1_sup, labels)
-                loss2 = self.criterion_BiSeNet(cx2_sup, labels)
+
 
                 # xxx ILTSS (distillation on features or logits)
 
                 # SCELTA PROGETTUALE SUGLI INPUT DELLE LOSS
-                """if self.lde_flag:
-                    lde = self.lde * self.lde_loss(features, features_old)"""
-
+                if self.lde_flag:
+                    lde = self.lde * self.lde_loss(features, features_old)
                 # skip with default settings
                 if self.lkd_flag:
                     # resize new output to remove new logits and keep only the old ones
