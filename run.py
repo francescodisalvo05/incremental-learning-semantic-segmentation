@@ -191,6 +191,9 @@ def main(opts):
     # Put the model on GPU
     model = model.cuda(device)
 
+    if model_old is not None:
+        model_old = model_old.cuda(device)
+
     # xxx Load old model from old weights if step > 0!
     if opts.step > 0:
         # get model path
