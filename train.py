@@ -116,7 +116,7 @@ class Trainer:
                     lkd = self.lkd * self.lkd_loss(outputs, outputs_old)
 
                 # xxx first backprop of previous loss (compute the gradients for regularization methods)
-                loss_tot = loss + loss1 + loss2 # lkd + + lde + l_icarl
+                loss_tot = loss + loss1 + loss2 + lkd # + lde + l_icarl
                 loss_tot = loss_tot.mean()
 
             self.scaler.scale(loss_tot).backward()
@@ -129,10 +129,10 @@ class Trainer:
             loss = loss.mean()
 
             epoch_loss += loss.item()
-            # reg_loss += l_reg.item() if l_reg != 0. else 0.
-            # reg_loss += lkd.item() + lde.item() + l_icarl.item()
-            interval_loss += loss.item() # + lkd.item() + lde.item() + l_icarl.item()
-            # interval_loss += l_reg.item() if l_reg != 0. else 0.
+            reg_loss += l_reg.item() if l_reg != 0. else 0.
+            reg_loss += lkd.item() + lde.item() + l_icarl.item()
+            interval_loss += loss.item() + lkd.item() + lde.item() + l_icarl.item()
+            interval_loss += l_reg.item() if l_reg != 0. else 0.
 
             if (cur_step + 1) % print_int == 0:
                 interval_loss = interval_loss / print_int
