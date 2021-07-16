@@ -35,6 +35,7 @@ class Trainer:
         else:
             self.criterion = nn.CrossEntropyLoss(ignore_index=255, reduction=reduction)
 
+        # loss for context path
         self.criterion_BiSeNet = nn.CrossEntropyLoss(ignore_index=255)
 
 
@@ -85,7 +86,7 @@ class Trainer:
             with amp.autocast():
                 if (self.lde_flag or self.lkd_flag) and self.model_old is not None:
                     with torch.no_grad():
-                        outputs_old, cx1_sup_old, cx2_sup_old = self.model_old(images, ret_intermediate=self.ret_intermediate)
+                        outputs_old = self.model_old(images, ret_intermediate=False)
 
                 optim.zero_grad()
 
@@ -176,7 +177,7 @@ class Trainer:
 
                 if (self.lde_flag or self.lkd_flag) and self.model_old is not None:
                     with torch.no_grad():
-                        outputs_old = self.model_old(images, ret_intermediate=True)
+                        outputs_old = self.model_old(images, ret_intermediate=False)
 
                 outputs, cx1_sup, cx2_sup = model(images, ret_intermediate=True)
 
