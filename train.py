@@ -102,9 +102,7 @@ class Trainer:
                     loss1 = self.criterion_BiSeNet(cx1_sup, labels)
                     loss2 = self.criterion_BiSeNet(cx2_sup, labels)
 
-                # loss = loss.mean()  # scalar
-
-
+                loss = loss.mean()  # scalar
 
                 # xxx ILTSS (distillation on features or logits)
 
