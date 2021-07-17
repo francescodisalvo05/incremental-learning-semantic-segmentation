@@ -117,7 +117,7 @@ class Trainer:
                     lkd = self.lkd * self.lkd_loss(outputs, outputs_old)
 
                 # xxx first backprop of previous loss (compute the gradients for regularization methods)
-                loss_tot = loss + loss1 + loss2 + lkd # + lde + l_icarl
+                loss_tot = loss + loss1 + loss2 + lkd + lde # + l_icarl
                 loss_tot = loss_tot.mean()
 
             self.scaler.scale(loss_tot).backward()
