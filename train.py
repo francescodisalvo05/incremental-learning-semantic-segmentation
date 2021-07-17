@@ -176,8 +176,10 @@ class Trainer:
                 if (self.lde_flag or self.lkd_flag) and self.model_old is not None:
                     with torch.no_grad():
                         outputs_old = self.model_old(images, ret_intermediate=False)
+                        features_old = self.model.features
 
                 outputs, cx1_sup, cx2_sup = model(images, ret_intermediate=True)
+                features = self.model.features
 
                 # xxx BCE / Cross Entropy Loss
                 #if not self.icarl_only_dist:
