@@ -197,7 +197,7 @@ class Trainer:
                 # xxx ILTSS (distillation on features or logits)
                 # loss calcolate su cx1, cx2 ?? ? ?? ? ? 
 
-                # with batch_size = 16, the last batch had 5 samples in features and 16 
+                # with batch_size = 16, the last batch had 5 samples in features and 16
                 if self.model_old and features.size()[0] == features_old.size()[0]:
                     lde = self.lde_loss(features, features_old)
 
