@@ -110,10 +110,9 @@ class Trainer:
                 # xxx ILTSS (distillation on features or logits)
                 # loss calcolate su cx1, cx2 ?? ? ?? ? ?
 
-                # with batch_size = 16, the last batch had 5 samples in features and 16
-                # in features. So we "skip" the computation of the last one
-                if features.size()[0] == features_old.size()[0] and self.lde_flag:
-                    lde = self.lde_loss(features, features_old)
+                # SCELTA PROGETTUALE SUGLI INPUT DELLE LOSS
+                if self.lde_flag:
+                    lde = self.lde * self.lde_loss(features, features_old)
 
                 # skip with default settings
                 if self.lkd_flag:
@@ -197,7 +196,9 @@ class Trainer:
 
                 # xxx ILTSS (distillation on features or logits)
                 # loss calcolate su cx1, cx2 ?? ? ?? ? ? 
-                if self.lde_flag:
+
+                # with batch_size = 16, the last batch had 5 samples in features and 16 
+                if self.model_old and features.size()[0] == features_old.size()[0]:
                     lde = self.lde_loss(features, features_old)
 
                 if self.lkd_flag:
