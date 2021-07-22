@@ -233,6 +233,7 @@ class DeepInversionClass(object):
 
             lim_0, lim_1 = self.jitter // lower_res, self.jitter // lower_res
 
+            # WE'RE HERE, ID = 0
             if self.setting_id == 0:
                 #multi resolution, 2k iterations with low resolution, 1k at normal, ResNet50v1.5 works the best, ResNet50 is ok
                 optimizer = optim.Adam([inputs], lr=self.lr, betas=[0.5, 0.9], eps = 1e-8)
@@ -377,6 +378,9 @@ class DeepInversionClass(object):
         # to reduce memory consumption by states of the optimizer we deallocate memory
         optimizer.state = collections.defaultdict(dict)
 
+        # ADD INCREMENTAL LOSS AS DEFINED ON THE PAPER
+        return inputs.data, loss_incremental
+
     def save_images(self, images, targets):
         # method to store generated images locally
         local_rank = torch.cuda.current_device()
@@ -411,8 +415,10 @@ class DeepInversionClass(object):
             if use_fp16:
                 targets = targets.half()
 
-        self.get_images(net_student=net_student, targets=targets)
+        generated_images, loss_incremental  = self.get_images(net_student=net_student, targets=targets)
 
         net_teacher.eval()
 
         self.num_generations += 1
+
+        return generated_images, loss_incremental
