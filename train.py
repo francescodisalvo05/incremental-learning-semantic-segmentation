@@ -7,6 +7,8 @@ from utils.loss import KnowledgeDistillationLoss, BCEWithLogitsLossWithIgnoreInd
     UnbiasedKnowledgeDistillationLoss, UnbiasedCrossEntropy, IcarlLoss
 from utils import get_regularizer
 
+from deepinversion import DeepInversionClass
+
 
 class Trainer:
     def __init__(self, model, model_old, device, opts, trainer_state=None, classes=None):
@@ -14,7 +16,6 @@ class Trainer:
         self.model_old = model_old
         self.model = model
         self.device = device
-
         self.scaler = amp.GradScaler()
 
         if classes is not None:
@@ -83,6 +84,55 @@ class Trainer:
             images = images.to(device, dtype=torch.float32)
             labels = labels.to(device, dtype=torch.long)
 
+            parameters = dict()
+            parameters["resolution"] = 224
+            parameters["random_label"] = False
+            parameters["start_noise"] = True
+            parameters["detach_student"] = False
+            parameters["do_flip"] = True
+
+            parameters["do_flip"] = args.do_flip
+            parameters["random_label"] = args.random_label
+            parameters["store_best_images"] = args.store_best_images
+
+            coefficients = dict()
+            coefficients["r_feature"] = args.r_feature
+            coefficients["first_bn_multiplier"] = args.first_bn_multiplier
+            coefficients["tv_l1"] = args.tv_l1
+            coefficients["tv_l2"] = args.tv_l2
+            coefficients["l2"] = args.l2
+            coefficients["lr"] = args.lr
+            coefficients["main_loss_multiplier"] = args.main_loss_multiplier
+            coefficients["adi_scale"] = args.adi_scale
+
+            # check accuracy of verifier
+            # if verifier (force to be True atm)
+            if 1:
+                hook_for_display = lambda x, y: validate_one(x, y, net_verifier)
+            else:
+                hook_for_display = None
+
+            if self.model_old:
+                deepInverionEngine = DeepInversionClass( net_teacher=model_old,
+                                                         final_data_path="./final_images/test",
+                                                         path='test',
+                                                         parameters=parameters,
+                                                         setting_id=0,
+                                                         bs=opts.batch_size,
+                                                         use_fp16=False,
+                                                         jitter=0,
+                                                         criterion=nn.CrossEntropyLoss(),
+                                                         coefficients=coefficients,
+                                                         network_output_function=lambda x: x,
+                                                         hook_for_display=hook_for_display)
+
+                net_student = model
+
+                generated_images, loss_incremental = deepInversionEngine.generate_batch(net_student=net_student)
+
+                ## loss??
+                ##
+
             with amp.autocast():
                 if (self.lde_flag or self.lkd_flag) and self.model_old is not None:
                     with torch.no_grad():
@@ -103,6 +153,9 @@ class Trainer:
                     loss2 = self.criterion_BiSeNet(cx2_sup, labels)
 
                 loss = loss.mean()  # scalar
+
+                ## CALCULATE DEEP INVERSION LOSS (PAPER)
+
 
                 # xxx ILTSS (distillation on features or logits)
 
