@@ -8,7 +8,7 @@ from utils.loss import KnowledgeDistillationLoss, BCEWithLogitsLossWithIgnoreInd
 from utils import get_regularizer
 
 from deepinversion import DeepInversionClass
-
+import tasks
 
 class Trainer:
     def __init__(self, model, model_old, device, opts, trainer_state=None, classes=None):
@@ -113,7 +113,7 @@ class Trainer:
                 hook_for_display = None
 
             if self.model_old:
-                deepInverionEngine = DeepInversionClass( net_teacher=model_old,
+                deepInversionEngine = DeepInversionClass(net_teacher=model_old.head,
                                                          final_data_path="./final_images/test",
                                                          path='test',
                                                          parameters=parameters,
@@ -124,26 +124,32 @@ class Trainer:
                                                          criterion=nn.CrossEntropyLoss(),
                                                          coefficients=coefficients,
                                                          network_output_function=lambda x: x,
-                                                         hook_for_display=hook_for_display)
+                                                         hook_for_display=hook_for_display,
+                                                         num_classes=tasks.get_task_labels(opts.dataset, opts.task, opts.step),
+                                                         image_resolution=opts.crop_size)
 
-                net_student = model
+                generated_images = deepInversionEngine.generate_batch(net_student=model.head)
 
-                generated_images, loss_incremental = deepInversionEngine.generate_batch(net_student=net_student)
-
-                ## loss??
-                ##
+            _, labels_old, _ = tasks.get_task_labels(opts.dataset, opts.task, opts.step)
 
             with amp.autocast():
                 if (self.lde_flag or self.lkd_flag) and self.model_old is not None:
                     with torch.no_grad():
                         outputs_old = self.model_old(images, ret_intermediate=False)
                         features_old = self.model_old.features
+
+                        outputs_generated_old = self.model_old(generated_images, ret_intermediate=False)
+
+
                 optim.zero_grad()
 
                 # output = concatenated output
                 # features = x_pl (Feature Fusion output)
                 outputs, cx1_sup, cx2_sup = model(images, ret_intermediate=self.ret_intermediate)
                 features = self.model.features
+
+                outputs_generated = self.model(generated_images, ret_intermediate=False)
+
                 # xxx BCE / Cross Entropy Loss
                 self.icarl_only_dist = False
                 if not self.icarl_only_dist:
@@ -152,10 +158,28 @@ class Trainer:
                     loss1 = self.criterion_BiSeNet(cx1_sup, labels)
                     loss2 = self.criterion_BiSeNet(cx2_sup, labels)
 
-                loss = loss.mean()  # scalar
+                # scalar
+                loss = loss.mean()
+
+                kl_loss = nn.KLDivLoss(reduction='batchmean').cuda()
+                cross_entropy_deepinv = nn.CrossEntropyLoss(ignore_index=255, reduction=reduction)
+
 
                 ## CALCULATE DEEP INVERSION LOSS (PAPER)
+                T = 3.0
 
+                # P = Student | Q = Teacher
+                P = nn.functional.softmax(outputs / T, dim=1)
+                Q = nn.functional.softmax(outputs_old / T, dim=1)
+
+                # normalization
+                P = torch.clamp(P, 0.01, 0.99)
+                Q = torch.clamp(Q, 0.01, 0.99)
+
+                # KL()
+                loss_deepinv = kl_loss(outputs_generated_old,outputs_generated) + \
+                               cross_entropy_deepinv(labels,outputs) + \
+                               kl_loss(outputs_old,outputs) #???
 
                 # xxx ILTSS (distillation on features or logits)
 
