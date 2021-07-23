@@ -76,7 +76,9 @@ class DeepInversionClass(object):
                  criterion=None,
                  coefficients=dict(),
                  network_output_function=lambda x: x,
-                 hook_for_display = None):
+                 hook_for_display = None,
+                 num_classes=None,
+                 image_resolution=None):
         '''
         :param bs: batch size per GPU for image generation
         :param use_fp16: use FP16 (or APEX AMP) for model inversion, uses less memory and is faster for GPUs with Tensor Cores
@@ -112,6 +114,10 @@ class DeepInversionClass(object):
         torch.manual_seed(torch.cuda.current_device())
 
         self.net_teacher = net_teacher
+        self.images = images
+        self.labels = labels
+        self.num_classes = num_classes
+        self.image_resolution = image_resolution
 
         if "resolution" in parameters.keys():
             self.image_resolution = parameters["resolution"]
@@ -193,23 +199,13 @@ class DeepInversionClass(object):
             #only works for classification now, for other tasks need to provide target vector
 
             # GET RANDOM LABELS
-            num_classes = None # get this value from the outside
-            targets = torch.LongTensor([random.randint(0,num_classes) for _ in range(self.bs)]).to('cuda')
-            if not self.random_label:
-                # preselected classes, good for ResNet50v1.5
-                targets = [1, 933, 946, 980, 25, 63, 92, 94, 107, 985, 151, 154, 207, 250, 270, 277, 283, 292, 294, 309,
-                           311,
-                           325, 340, 360, 386, 402, 403, 409, 530, 440, 468, 417, 590, 670, 817, 762, 920, 949, 963,
-                           967, 574, 487]
-
-                targets = torch.LongTensor(targets * (int(self.bs / len(targets)))).to('cuda')
+            targets = torch.LongTensor([random.randint(0,self.num_classes) for _ in range(self.bs)]).to('cuda')
 
         img_original = self.image_resolution
 
         data_type = torch.half if use_fp16 else torch.float
 
-        # img_original is our crop size
-        # It is the noise
+        # img_original is our crop size. It is the noise
         inputs = torch.randn((self.bs, 3, img_original, img_original), requires_grad=True, device='cuda',
                              dtype=data_type)
         pooling_function = nn.modules.pooling.AvgPool2d(kernel_size=2)
@@ -300,7 +296,6 @@ class DeepInversionClass(object):
                     else:
                         outputs_student = net_student(inputs_jit)
 
-                    T = 3.0
                     if 1:
                         T = 3.0
                         # Jensen Shanon divergence:
@@ -378,8 +373,7 @@ class DeepInversionClass(object):
         # to reduce memory consumption by states of the optimizer we deallocate memory
         optimizer.state = collections.defaultdict(dict)
 
-        # ADD INCREMENTAL LOSS AS DEFINED ON THE PAPER
-        return inputs.data, loss_incremental
+        return inputs.data
 
     def save_images(self, images, targets):
         # method to store generated images locally
@@ -415,10 +409,10 @@ class DeepInversionClass(object):
             if use_fp16:
                 targets = targets.half()
 
-        generated_images, loss_incremental  = self.get_images(net_student=net_student, targets=targets)
+        generated_image = self.get_images(net_student=net_student, targets=targets)
 
         net_teacher.eval()
 
         self.num_generations += 1
 
-        return generated_images, loss_incremental
+        return generated_image
