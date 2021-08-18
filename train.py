@@ -5,7 +5,10 @@ from functools import reduce
 
 from utils.loss import KnowledgeDistillationLoss, BCEWithLogitsLossWithIgnoreIndex, \
     UnbiasedKnowledgeDistillationLoss, UnbiasedCrossEntropy, IcarlLoss
+
 from utils import get_regularizer
+
+from dataset.voc import CustomVOCSegmentation
 
 from deepinversion import DeepInversionClass
 import tasks
@@ -17,6 +20,7 @@ class Trainer:
         self.model = model
         self.device = device
         self.scaler = amp.GradScaler()
+        self.deepinversion_dst = CustomVOCSegmentation
 
         if classes is not None:
             new_classes = classes[-1]
@@ -84,6 +88,7 @@ class Trainer:
             images = images.to(device, dtype=torch.float32)
             labels = labels.to(device, dtype=torch.long)
 
+            # to do : add these elements to the argparser
             parameters = dict()
             parameters["resolution"] = 224
             parameters["random_label"] = False
@@ -107,11 +112,9 @@ class Trainer:
 
             # check accuracy of verifier
             # if verifier (force to be True atm)
-            if 1:
-                hook_for_display = lambda x, y: validate_one(x, y, net_verifier)
-            else:
-                hook_for_display = None
+            hook_for_display = lambda x, y: validate_one(x, y, net_verifier)
 
+            # we need a new model for each batch
             if self.model_old:
                 deepInversionEngine = DeepInversionClass(net_teacher=model_old.head,
                                                          final_data_path="./final_images/test",
@@ -130,14 +133,13 @@ class Trainer:
 
                 generated_images = deepInversionEngine.generate_batch(net_student=model.head)
 
-            _, labels_old, _ = tasks.get_task_labels(opts.dataset, opts.task, opts.step)
-
             with amp.autocast():
                 if (self.lde_flag or self.lkd_flag) and self.model_old is not None:
                     with torch.no_grad():
                         outputs_old = self.model_old(images, ret_intermediate=False)
                         features_old = self.model_old.features
 
+                        # classify the generated images (for the new loss of deepinversion)
                         outputs_generated_old = self.model_old(generated_images, ret_intermediate=False)
 
 
@@ -148,6 +150,7 @@ class Trainer:
                 outputs, cx1_sup, cx2_sup = model(images, ret_intermediate=self.ret_intermediate)
                 features = self.model.features
 
+                # classify the generated images (for the new loss of deepinversion)
                 outputs_generated = self.model(generated_images, ret_intermediate=False)
 
                 # xxx BCE / Cross Entropy Loss
@@ -155,15 +158,13 @@ class Trainer:
                 if not self.icarl_only_dist:
                     # criterion = nn.CrossEntropyLoss(ignore_index=255, reduction=reduction)
                     loss = criterion(outputs, labels)  # B x H x W
-                    loss1 = self.criterion_BiSeNet(cx1_sup, labels)
-                    loss2 = self.criterion_BiSeNet(cx2_sup, labels)
+                    loss1 = self.criterion_BiSeNet(cx1_sup, labels) # scalar
+                    loss2 = self.criterion_BiSeNet(cx2_sup, labels) # scalar
 
-                # scalar
-                loss = loss.mean()
+                loss = loss.mean() # scalar
 
                 kl_loss = nn.KLDivLoss(reduction='batchmean').cuda()
                 cross_entropy_deepinv = nn.CrossEntropyLoss(ignore_index=255, reduction=reduction)
-
 
                 ## CALCULATE DEEP INVERSION LOSS (PAPER)
                 T = 3.0
@@ -179,7 +180,7 @@ class Trainer:
                 # KL()
                 loss_deepinv = kl_loss(outputs_generated_old,outputs_generated) + \
                                cross_entropy_deepinv(labels,outputs) + \
-                               kl_loss(outputs_old,outputs) #???
+                               kl_loss(outputs_old,outputs) # initial dataset??
 
                 # xxx ILTSS (distillation on features or logits)
 
