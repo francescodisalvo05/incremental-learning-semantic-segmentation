@@ -91,7 +91,7 @@ class Trainer:
             labels = labels.to(device, dtype=torch.long)
 
             # get synthetized imagess
-            synthetic_images = self.deepinversion_dst.get_random_batch(images.size[0])
+            synthetic_images = self.deepinversion_dst.get_random_batch()
 
             with amp.autocast():
                 if (self.lde_flag or self.lkd_flag) and self.model_old is not None:
@@ -133,6 +133,7 @@ class Trainer:
                     lkd = self.lkd * self.lkd_loss(outputs, outputs_old)
 
                 if self.model_old:
+
                     kl = self.kl_loss(outputs_synthetic,outputs_synthetic_old)
 
                 # xxx first backprop of previous loss (compute the gradients for regularization methods)
