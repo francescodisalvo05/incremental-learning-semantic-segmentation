@@ -5,7 +5,7 @@ from torch import distributed
 import torchvision as tv
 import numpy as np
 from .utils import Subset, filter_images, group_images
-
+import torch
 from PIL import Image
 
 classes = {
@@ -180,6 +180,7 @@ class VOCSegmentationIncremental(data.Dataset):
         while 0 in labels:
             labels.remove(0)
 
+
 class CustomVOCSegmentation(data.Dataset):
     """`Pascal VOC <http://host.robots.ox.ac.uk/pascal/VOC/>`_ Segmentation Dataset.
     Args:
@@ -214,7 +215,7 @@ class CustomVOCSegmentation(data.Dataset):
         Returns:
             tuple: (image, target) where target is the image segmentation.
         """
-        img = Image.open(self.images[index]).convert('RGB')
+        img = Image.open(self.root + "/" + self.images[index]).convert('RGB')
 
         # resize the image from 256x256 to 512x512
         tensor_image = tv.transforms.ToTensor()(img).unsqueeze_(0)
@@ -239,5 +240,5 @@ class CustomVOCSegmentation(data.Dataset):
 
         # temporary it will be just random
         # do we need a criteria?
-
-        return [self.get(random.randint(0,self.num_images)) for _ in range(self.batch_size)]
+        tensor_of_images = torch.cuda.HalfTensor([self.__getitem__(random.randint(0,self.num_images-1)).numpy() for _ in range(self.batch_size)])
+        return tensor_of_images
