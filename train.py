@@ -8,7 +8,7 @@ from utils.loss import KnowledgeDistillationLoss, BCEWithLogitsLossWithIgnoreInd
 
 from utils import get_regularizer
 
-from dataset.voc import CustomVOCSegmentation
+from dataset import CustomVOCSegmentation
 
 from deepinversion import DeepInversionClass
 import tasks
@@ -20,7 +20,7 @@ class Trainer:
         self.model = model
         self.device = device
         self.scaler = amp.GradScaler()
-        self.deepinversion_dst = CustomVOCSegmentation
+        self.deepinversion_dst = CustomVOCSegmentation(opts.deepinversion_images, opts.batch_size)
 
         if classes is not None:
             new_classes = classes[-1]
@@ -43,7 +43,8 @@ class Trainer:
         # loss for context path
         self.criterion_BiSeNet = nn.CrossEntropyLoss(ignore_index=255)
 
-
+        # loss for synthetic images (DeepInversion)
+        self.kl_loss = nn.KLDivLoss(reduction='batchmean').cuda()
 
         # ILTSS
         self.lde = opts.loss_de
@@ -78,6 +79,7 @@ class Trainer:
         interval_loss = 0.0
         lkd = torch.tensor(0.)
         lde = torch.tensor(0.)
+        kl = torch.tensor(0.)
         l_icarl = torch.tensor(0.)
         l_reg = torch.tensor(0.)
 
@@ -88,50 +90,8 @@ class Trainer:
             images = images.to(device, dtype=torch.float32)
             labels = labels.to(device, dtype=torch.long)
 
-            # to do : add these elements to the argparser
-            parameters = dict()
-            parameters["resolution"] = 224
-            parameters["random_label"] = False
-            parameters["start_noise"] = True
-            parameters["detach_student"] = False
-            parameters["do_flip"] = True
-
-            parameters["do_flip"] = args.do_flip
-            parameters["random_label"] = args.random_label
-            parameters["store_best_images"] = args.store_best_images
-
-            coefficients = dict()
-            coefficients["r_feature"] = args.r_feature
-            coefficients["first_bn_multiplier"] = args.first_bn_multiplier
-            coefficients["tv_l1"] = args.tv_l1
-            coefficients["tv_l2"] = args.tv_l2
-            coefficients["l2"] = args.l2
-            coefficients["lr"] = args.lr
-            coefficients["main_loss_multiplier"] = args.main_loss_multiplier
-            coefficients["adi_scale"] = args.adi_scale
-
-            # check accuracy of verifier
-            # if verifier (force to be True atm)
-            hook_for_display = lambda x, y: validate_one(x, y, net_verifier)
-
-            # we need a new model for each batch
-            if self.model_old:
-                deepInversionEngine = DeepInversionClass(net_teacher=model_old.head,
-                                                         final_data_path="./final_images/test",
-                                                         path='test',
-                                                         parameters=parameters,
-                                                         setting_id=0,
-                                                         bs=opts.batch_size,
-                                                         use_fp16=False,
-                                                         jitter=0,
-                                                         criterion=nn.CrossEntropyLoss(),
-                                                         coefficients=coefficients,
-                                                         network_output_function=lambda x: x,
-                                                         hook_for_display=hook_for_display,
-                                                         num_classes=tasks.get_task_labels(opts.dataset, opts.task, opts.step),
-                                                         image_resolution=opts.crop_size)
-
-                generated_images = deepInversionEngine.generate_batch(net_student=model.head)
+            # get synthetized imagess
+            synthetic_images = self.deepinversion_dst.get_random_batch(images.size[0])
 
             with amp.autocast():
                 if (self.lde_flag or self.lkd_flag) and self.model_old is not None:
@@ -140,7 +100,7 @@ class Trainer:
                         features_old = self.model_old.features
 
                         # classify the generated images (for the new loss of deepinversion)
-                        outputs_generated_old = self.model_old(generated_images, ret_intermediate=False)
+                        outputs_synthetic_old = self.model_old(synthetic_images, ret_intermediate=False)
 
 
                 optim.zero_grad()
@@ -151,7 +111,7 @@ class Trainer:
                 features = self.model.features
 
                 # classify the generated images (for the new loss of deepinversion)
-                outputs_generated = self.model(generated_images, ret_intermediate=False)
+                outputs_synthetic = self.model(synthetic_images, ret_intermediate=False)
 
                 # xxx BCE / Cross Entropy Loss
                 self.icarl_only_dist = False
@@ -163,31 +123,6 @@ class Trainer:
 
                 loss = loss.mean() # scalar
 
-                kl_loss = nn.KLDivLoss(reduction='batchmean').cuda()
-                cross_entropy_deepinv = nn.CrossEntropyLoss(ignore_index=255, reduction=reduction)
-
-                ## CALCULATE DEEP INVERSION LOSS (PAPER)
-                T = 3.0
-
-                # P = Student | Q = Teacher
-                P = nn.functional.softmax(outputs / T, dim=1)
-                Q = nn.functional.softmax(outputs_old / T, dim=1)
-
-                # normalization
-                P = torch.clamp(P, 0.01, 0.99)
-                Q = torch.clamp(Q, 0.01, 0.99)
-
-                # KL()
-                loss_deepinv = kl_loss(outputs_generated_old,outputs_generated) + \
-                               cross_entropy_deepinv(labels,outputs) + \
-                               kl_loss(outputs_old,outputs) # initial dataset??
-
-                # xxx ILTSS (distillation on features or logits)
-
-                # SCELTA PROGETTUALE SUGLI INPUT DELLE LOSS
-                # xxx ILTSS (distillation on features or logits)
-                # loss calcolate su cx1, cx2 ?? ? ?? ? ?
-
                 # SCELTA PROGETTUALE SUGLI INPUT DELLE LOSS
                 if self.lde_flag:
                     lde = self.lde * self.lde_loss(features, features_old)
@@ -197,8 +132,11 @@ class Trainer:
                     # resize new output to remove new logits and keep only the old ones
                     lkd = self.lkd * self.lkd_loss(outputs, outputs_old)
 
+                if self.model_old:
+                    kl = self.kl_loss(outputs_synthetic,outputs_synthetic_old)
+
                 # xxx first backprop of previous loss (compute the gradients for regularization methods)
-                loss_tot = loss + loss1 + loss2 + lkd + lde # + l_icarl
+                loss_tot = loss + loss1 + loss2 + lkd + lde + kl
                 loss_tot = loss_tot.mean()
 
             self.scaler.scale(loss_tot).backward()
