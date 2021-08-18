@@ -179,3 +179,47 @@ class VOCSegmentationIncremental(data.Dataset):
     def __strip_zero(labels):
         while 0 in labels:
             labels.remove(0)
+
+class CustomVOCSegmentation(data.Dataset):
+    """`Pascal VOC <http://host.robots.ox.ac.uk/pascal/VOC/>`_ Segmentation Dataset.
+    Args:
+        root (string): Root directory of the VOC Dataset.
+        image_set (string, optional): Select the image_set to use, ``train``, ``trainval`` or ``val``
+        is_aug (bool, optional): If you want to use the augmented train set or not (default is True)
+        transform (callable, optional): A function/transform that  takes in an PIL image
+            and returns a transformed version. E.g, ``transforms.RandomCrop``
+    """
+
+    def __init__(self,
+                 root):
+
+        # root directory
+        self.root = root
+        self.custom_transform = tv.transforms.Compose([tv.transforms.Resize(256*2)])
+
+        if not os.path.isdir(self.root):
+            raise RuntimeError('DeepInversion dataset not found or corrupted.')
+
+        # we don't care about the label (?)
+        self.images = os.listdir(self.root)
+
+    def __getitem__(self, index):
+        """
+        Args:
+            index (int): Index
+        Returns:
+            tuple: (image, target) where target is the image segmentation.
+        """
+        img = Image.open(self.images[index]).convert('RGB')
+
+        # resize the image from 256x256 to 512x512
+        tensor_image = tv.transforms.ToTensor()(img).unsqueeze_(0)
+        transformed_image = self.custom_transform(tensor_image)[0]
+
+        # check if we need to return the tensor or the PIL image
+        # do we need to return the label?
+        # >> it is on the filename
+        return transformed_image
+
+    def __len__(self):
+        return len(self.images)

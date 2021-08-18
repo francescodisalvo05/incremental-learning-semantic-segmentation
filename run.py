@@ -12,7 +12,7 @@ import torch
 from torch.utils import data
 from torch import distributed
 
-from dataset import VOCSegmentationIncremental, AdeSegmentationIncremental
+from dataset import VOCSegmentationIncremental, AdeSegmentationIncremental, CustomVOCSegmentation
 from dataset import transform
 from metrics import StreamSegMetrics
 from torch.cuda import amp
@@ -66,6 +66,9 @@ def get_dataset(opts):
 
     labels, labels_old, path_base = tasks.get_task_labels(opts.dataset, opts.task, opts.step)
     labels_cum = labels_old + labels
+
+    # extract DeepInversion images
+    deepinv_dataset = CustomVOCSegmentation
 
     if opts.dataset == 'voc':
         dataset = VOCSegmentationIncremental
