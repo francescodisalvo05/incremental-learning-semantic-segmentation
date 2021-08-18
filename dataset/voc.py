@@ -191,17 +191,21 @@ class CustomVOCSegmentation(data.Dataset):
     """
 
     def __init__(self,
-                 root):
+                 root,
+                 batch_size):
 
         # root directory
         self.root = root
         self.custom_transform = tv.transforms.Compose([tv.transforms.Resize(256*2)])
+        self.batch_size = batch_size
 
         if not os.path.isdir(self.root):
             raise RuntimeError('DeepInversion dataset not found or corrupted.')
 
         # we don't care about the label (?)
         self.images = os.listdir(self.root)
+
+        self.num_images = len(self.images)
 
     def __getitem__(self, index):
         """
@@ -223,3 +227,17 @@ class CustomVOCSegmentation(data.Dataset):
 
     def __len__(self):
         return len(self.images)
+
+
+    def get_random_batch(self):
+        """
+        :return:
+            img: return an image with a random idx
+        """
+
+        # here we need to setup the overall structure of the extraction
+
+        # temporary it will be just random
+        # do we need a criteria?
+
+        return [self.get(random.randint(0,self.num_images)) for _ in range(self.batch_size)]
