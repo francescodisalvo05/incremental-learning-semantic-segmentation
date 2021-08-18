@@ -60,7 +60,7 @@ def get_argparser():
                         choices=['voc', 'ade'], help='Name of dataset')
     parser.add_argument("--num_classes", type=int, default=None,
                         help="num classes (default: None)")
-    parser.add_argument("--deepinversion_images", type=int, default=None,
+    parser.add_argument("--deepinversion_images", type=str, default=None,
                         help="path to DeepInversion synthetic images")
 
 
