@@ -10,7 +10,6 @@ from utils import get_regularizer
 
 from dataset import CustomVOCSegmentation
 
-from deepinversion import DeepInversionClass
 import tasks
 
 class Trainer:
@@ -111,7 +110,10 @@ class Trainer:
                 features = self.model.features
 
                 # classify the generated images (for the new loss of deepinversion)
-                outputs_synthetic = self.model(synthetic_images, ret_intermediate=False)
+                # get synthetized imagess
+                from torch import autograd
+                with autograd.detect_anomaly():
+                  outputs_synthetic = self.model(synthetic_images, ret_intermediate=False)
 
                 # xxx BCE / Cross Entropy Loss
                 self.icarl_only_dist = False
@@ -133,9 +135,9 @@ class Trainer:
                     lkd = self.lkd * self.lkd_loss(outputs, outputs_old)
 
                 if self.model_old:
-
-                    kl = self.kl_loss(outputs_synthetic,outputs_synthetic_old)
-
+                    # lkd = self.lkd * self.lkd_loss(outputs, outputs_old)
+                    kl = 0.00000001 * self.kl_loss(outputs_synthetic[:,:outputs_synthetic_old.shape[1],:,:],outputs_synthetic_old)
+                    
                 # xxx first backprop of previous loss (compute the gradients for regularization methods)
                 loss_tot = loss + loss1 + loss2 + lkd + lde + kl
                 loss_tot = loss_tot.mean()
