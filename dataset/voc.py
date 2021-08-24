@@ -197,7 +197,7 @@ class CustomVOCSegmentation(data.Dataset):
 
         # root directory
         self.root = root
-        self.custom_transform = tv.transforms.Compose([tv.transforms.Resize(256*2)])
+        self.custom_transform = tv.transforms.Compose([tv.transforms.Resize(256*1)])
         self.batch_size = batch_size
 
         if not os.path.isdir(self.root):
