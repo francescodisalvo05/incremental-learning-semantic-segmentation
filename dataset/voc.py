@@ -208,14 +208,24 @@ class CustomVOCSegmentation(data.Dataset):
 
         self.num_images = len(self.images)
 
-    def __getitem__(self, index):
+
+    def __getitem__(self, class_img):
         """
         Args:
             index (int): Index
         Returns:
             tuple: (image, target) where target is the image segmentation.
         """
-        img = Image.open(self.root + "/" + self.images[index]).convert('RGB')
+        
+        candidates = []
+        for curr_img in self.images:
+          
+          if int(curr_img.split("_")[1][2:]) == class_img:
+            candidates.append(curr_img)
+
+        str_img = candidates[random.randint(0,len(candidates)-1)]
+        
+        img = Image.open(self.root + "/" + str_img).convert('RGB')
 
         # resize the image from 256x256 to 512x512
         tensor_image = tv.transforms.ToTensor()(img).unsqueeze_(0)
@@ -240,5 +250,5 @@ class CustomVOCSegmentation(data.Dataset):
 
         # temporary it will be just random
         # do we need a criteria?
-        tensor_of_images = torch.cuda.HalfTensor([self.__getitem__(random.randint(0,self.num_images-1)).numpy() for _ in range(self.batch_size)])
+        tensor_of_images = torch.cuda.HalfTensor([self.__getitem__(i).numpy() for i in range(1,16)])
         return tensor_of_images
