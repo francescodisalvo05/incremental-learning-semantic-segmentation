@@ -182,13 +182,13 @@ class VOCSegmentationIncremental(data.Dataset):
 
 
 class CustomVOCSegmentation(data.Dataset):
-    """`Pascal VOC <http://host.robots.ox.ac.uk/pascal/VOC/>`_ Segmentation Dataset.
+    """Inverted `Pascal VOC <http://host.robots.ox.ac.uk/pascal/VOC/>`_ Segmentation Dataset.
     Args:
         root (string): Root directory of the VOC Dataset.
-        image_set (string, optional): Select the image_set to use, ``train``, ``trainval`` or ``val``
-        is_aug (bool, optional): If you want to use the augmented train set or not (default is True)
         transform (callable, optional): A function/transform that  takes in an PIL image
             and returns a transformed version. E.g, ``transforms.RandomCrop``
+        batch_size (int) : batch size of the initial data loader. We want a 1:1 ratio
+            with the real images
     """
 
     def __init__(self,
@@ -197,58 +197,56 @@ class CustomVOCSegmentation(data.Dataset):
 
         # root directory
         self.root = root
-        self.custom_transform = tv.transforms.Compose([tv.transforms.Resize(256*1)])
+        self.custom_transform = tv.transforms.Compose([tv.transforms.Resize(256*1)]) # with 512 we have out of memory
         self.batch_size = batch_size
 
         if not os.path.isdir(self.root):
             raise RuntimeError('DeepInversion dataset not found or corrupted.')
 
-        # we don't care about the label (?)
+        # we don't care about the label
+        # we need to make distillation among teacher and student
         self.images = os.listdir(self.root)
-
         self.num_images = len(self.images)
 
-
     def __getitem__(self, class_img):
-        """
+        """Select a random image for a given class
+
         Args:
-            index (int): Index
+            class_img (int): index of the class to get
         Returns:
-            tuple: (image, target) where target is the image segmentation.
+            transformed_image (tensor): image of the given class
         """
-        
+
+        # select all the images of the selected class
         candidates = []
         for curr_img in self.images:
-          
-          if int(curr_img.split("_")[1][2:]) == class_img:
-            candidates.append(curr_img)
 
-        str_img = candidates[random.randint(0,len(candidates)-1)]
-        
+            # the class is on the file name
+            # e.g.
+            if int(curr_img.split("_")[1][2:]) == class_img:
+                candidates.append(curr_img)
+
+        # randomly extract one image from the candidates
+        str_img = candidates[random.randint(0, len(candidates) - 1)]
+
+        # convert to image
         img = Image.open(self.root + "/" + str_img).convert('RGB')
 
-        # resize the image from 256x256 to 512x512
+        # resize the image from 256x256 to 512x512 | deprecated (out of memory!)
         tensor_image = tv.transforms.ToTensor()(img).unsqueeze_(0)
         transformed_image = self.custom_transform(tensor_image)[0]
 
-        # check if we need to return the tensor or the PIL image
-        # do we need to return the label?
-        # >> it is on the filename
         return transformed_image
 
     def __len__(self):
         return len(self.images)
 
-
     def get_random_batch(self):
         """
         :return:
-            img: return an image with a random idx
+            img: return a batch of images, one for each class
         """
+        # get one image for each class, from 1 to 15
+        tensor_of_images = torch.cuda.HalfTensor([self.__getitem__(i).numpy() for i in range(1, 16)])
 
-        # here we need to setup the overall structure of the extraction
-
-        # temporary it will be just random
-        # do we need a criteria?
-        tensor_of_images = torch.cuda.HalfTensor([self.__getitem__(i).numpy() for i in range(1,16)])
         return tensor_of_images
