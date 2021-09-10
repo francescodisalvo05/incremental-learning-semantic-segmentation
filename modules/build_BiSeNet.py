@@ -4,6 +4,7 @@ from modules.build_contextpath import build_contextpath
 import warnings
 warnings.filterwarnings(action='ignore')
 
+
 class ConvBlock(torch.nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size=3, stride=2,padding=1):
         super().__init__()
@@ -14,6 +15,7 @@ class ConvBlock(torch.nn.Module):
     def forward(self, input):
         x = self.conv1(input)
         return self.relu(self.bn(x))
+
 
 class Spatial_path(torch.nn.Module):
     def __init__(self):
@@ -27,6 +29,7 @@ class Spatial_path(torch.nn.Module):
         x = self.convblock2(x)
         x = self.convblock3(x)
         return x
+
 
 class AttentionRefinementModule(torch.nn.Module):
     def __init__(self, in_channels, out_channels):
@@ -63,7 +66,6 @@ class FeatureFusionModule(torch.nn.Module):
         self.conv2 = nn.Conv2d(256, 256, kernel_size=1)
         self.sigmoid = nn.Sigmoid()
         self.avgpool = nn.AdaptiveAvgPool2d(output_size=(1, 1))
-
 
     def forward(self, input_1, input_2):
         x = torch.cat((input_1, input_2), dim=1)

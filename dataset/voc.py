@@ -5,7 +5,7 @@ from torch import distributed
 import torchvision as tv
 import numpy as np
 from .utils import Subset, filter_images, group_images
-
+import torch
 from PIL import Image
 
 classes = {
@@ -179,3 +179,74 @@ class VOCSegmentationIncremental(data.Dataset):
     def __strip_zero(labels):
         while 0 in labels:
             labels.remove(0)
+
+
+class CustomVOCSegmentation(data.Dataset):
+    """Inverted `Pascal VOC <http://host.robots.ox.ac.uk/pascal/VOC/>`_ Segmentation Dataset.
+    Args:
+        root (string): Root directory of the VOC Dataset.
+        transform (callable, optional): A function/transform that  takes in an PIL image
+            and returns a transformed version. E.g, ``transforms.RandomCrop``
+        batch_size (int) : batch size of the initial data loader. We want a 1:1 ratio
+            with the real images
+    """
+
+    def __init__(self,
+                 root,
+                 batch_size):
+
+        # root directory
+        self.root = root
+        self.custom_transform = tv.transforms.Compose([tv.transforms.Resize(256*1)]) # with 512 we have out of memory
+        self.batch_size = batch_size
+
+        if not os.path.isdir(self.root):
+            raise RuntimeError('DeepInversion dataset not found or corrupted.')
+
+        # we don't care about the label
+        # we need to make distillation among teacher and student
+        self.images = os.listdir(self.root)
+        self.num_images = len(self.images)
+
+    def __getitem__(self, class_img):
+        """Select a random image for a given class
+
+        Args:
+            class_img (int): index of the class to get
+        Returns:
+            transformed_image (tensor): image of the given class
+        """
+
+        # select all the images of the selected class
+        candidates = []
+        for curr_img in self.images:
+
+            # the class is on the file name
+            # e.g.
+            if int(curr_img.split("_")[1][2:]) == class_img:
+                candidates.append(curr_img)
+
+        # randomly extract one image from the candidates
+        str_img = candidates[random.randint(0, len(candidates) - 1)]
+
+        # convert to image
+        img = Image.open(self.root + "/" + str_img).convert('RGB')
+
+        # resize the image from 256x256 to 512x512 | deprecated (out of memory!)
+        tensor_image = tv.transforms.ToTensor()(img).unsqueeze_(0)
+        transformed_image = self.custom_transform(tensor_image)[0]
+
+        return transformed_image
+
+    def __len__(self):
+        return len(self.images)
+
+    def get_random_batch(self):
+        """
+        :return:
+            img: return a batch of images, one for each class
+        """
+        # get one image for each class, from 1 to 15
+        tensor_of_images = torch.cuda.HalfTensor([self.__getitem__(i).numpy() for i in range(1, 16)])
+
+        return tensor_of_images

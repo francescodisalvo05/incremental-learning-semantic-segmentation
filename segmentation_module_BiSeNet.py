@@ -7,9 +7,10 @@ from functools import reduce
 
 from modules.build_BiSeNet import  BiSeNet
 
+
 def make_model(opts, classes=None):
 
-    # string with the backbone e.g. 'resnet'
+    # string with the backbone e.g. 'resnet50'
     body = opts.backbone
 
     if not opts.no_pretrained:
@@ -22,12 +23,7 @@ def make_model(opts, classes=None):
         del pre_dict  # free memory
 
     head = BiSeNet(body)
-
-    if classes is not None:
-        model = IncrementalSegmentationBiSeNet(body, head, classes=classes, fusion_mode=opts.fusion_mode)
-    else:
-        # model = SegmentationModule(body, head, head_channels, opts.num_classes, opts.fusion_mode)
-        pass
+    model = IncrementalSegmentationBiSeNet(body, head, classes=classes, fusion_mode=opts.fusion_mode)
 
     return model
 
@@ -59,10 +55,9 @@ class IncrementalSegmentationBiSeNet(nn.Module):
             [nn.Conv2d(in_channels=2048, out_channels=c, kernel_size=1) for c in classes]
         )
 
-        # classifiers for the final layers
+        # classifiers for the final layer
         self.cls = nn.ModuleList(
             [nn.Conv2d(in_channels=256, out_channels=c, kernel_size=1) for c in classes]
-            # [nn.Conv2d(256, c, 1) for c in classes]
         )
 
         self.classes = classes
@@ -91,7 +86,6 @@ class IncrementalSegmentationBiSeNet(nn.Module):
         cx1_sup = torch.cat(cx1_out, dim=1)
         cx2_sup = torch.cat(cx2_out, dim=1)
 
-        # it is forced to True at the moment
         if ret_intermediate:
             return x_o, cx1_sup, cx2_sup
 
