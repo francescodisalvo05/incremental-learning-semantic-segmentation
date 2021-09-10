@@ -115,7 +115,11 @@ class Trainer:
                 with autograd.detect_anomaly():
                   outputs_synthetic = self.model(synthetic_images, ret_intermediate=False)
 
-                loss = loss.mean() # scalar
+                # BiSeNet loss
+                loss = criterion(outputs, labels)  # B x H x W
+                loss1 = self.criterion_BiSeNet(cx1_sup, labels)  # scalar
+                loss2 = self.criterion_BiSeNet(cx2_sup, labels)  # scalar
+                loss = loss.mean()  # scalar
 
                 if self.lde_flag:
                     lde = self.lde * self.lde_loss(features, features_old)
