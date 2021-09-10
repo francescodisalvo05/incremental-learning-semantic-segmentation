@@ -4,7 +4,7 @@ from torch.cuda import amp
 from functools import reduce
 
 from utils.loss import KnowledgeDistillationLoss, BCEWithLogitsLossWithIgnoreIndex, \
-    UnbiasedKnowledgeDistillationLoss, UnbiasedCrossEntropy, IcarlLoss
+    UnbiasedKnowledgeDistillationLoss, UnbiasedCrossEntropy
 
 from utils import get_regularizer
 
@@ -12,7 +12,9 @@ from dataset import CustomVOCSegmentation
 
 import tasks
 
+
 class Trainer:
+
     def __init__(self, model, model_old, device, opts, trainer_state=None, classes=None):
 
         self.model_old = model_old
@@ -40,7 +42,7 @@ class Trainer:
             self.criterion = nn.CrossEntropyLoss(ignore_index=255, reduction=reduction)
 
         # loss for context path
-        self.criterion_BiSeNet = nn.CrossEntropyLoss(ignore_index=255)
+        self.criterion_BiSeNet = UnbiasedKnowledgeDistillationLoss(alpha=opts.alpha)
 
         # loss for synthetic images (DeepInversion)
         self.kl_loss = nn.KLDivLoss(reduction='batchmean').cuda()
@@ -65,6 +67,9 @@ class Trainer:
 
         self.ret_intermediate = True
 
+    def mse_logit(self, output, teacher_output):
+        return nn.MSELoss()(output, teacher_output)
+
     def train(self, cur_epoch, optim, train_loader, scheduler=None, print_int=10, logger=None):
         """Train and return epoch loss"""
         logger.info("Epoch %d, lr = %f" % (cur_epoch, optim.param_groups[0]['lr']))
@@ -78,7 +83,7 @@ class Trainer:
         interval_loss = 0.0
         lkd = torch.tensor(0.)
         lde = torch.tensor(0.)
-        kl = torch.tensor(0.)
+        ldi = torch.tensor(0.)
         l_icarl = torch.tensor(0.)
         l_reg = torch.tensor(0.)
 
@@ -101,31 +106,17 @@ class Trainer:
                         # classify the generated images (for the new loss of deepinversion)
                         outputs_synthetic_old = self.model_old(synthetic_images, ret_intermediate=False)
 
-
                 optim.zero_grad()
 
-                # output = concatenated output
-                # features = x_pl (Feature Fusion output)
                 outputs, cx1_sup, cx2_sup = model(images, ret_intermediate=self.ret_intermediate)
                 features = self.model.features
 
-                # classify the generated images (for the new loss of deepinversion)
-                # get synthetized imagess
                 from torch import autograd
                 with autograd.detect_anomaly():
                   outputs_synthetic = self.model(synthetic_images, ret_intermediate=False)
 
-                # xxx BCE / Cross Entropy Loss
-                self.icarl_only_dist = False
-                if not self.icarl_only_dist:
-                    # criterion = nn.CrossEntropyLoss(ignore_index=255, reduction=reduction)
-                    loss = criterion(outputs, labels)  # B x H x W
-                    loss1 = self.criterion_BiSeNet(cx1_sup, labels) # scalar
-                    loss2 = self.criterion_BiSeNet(cx2_sup, labels) # scalar
-
                 loss = loss.mean() # scalar
 
-                # SCELTA PROGETTUALE SUGLI INPUT DELLE LOSS
                 if self.lde_flag:
                     lde = self.lde * self.lde_loss(features, features_old)
 
@@ -134,12 +125,12 @@ class Trainer:
                     # resize new output to remove new logits and keep only the old ones
                     lkd = self.lkd * self.lkd_loss(outputs, outputs_old)
 
+                # deep inversion loss
                 if self.model_old:
-                    # lkd = self.lkd * self.lkd_loss(outputs, outputs_old)
-                    kl = 0.00000001 * self.kl_loss(outputs_synthetic[:,:outputs_synthetic_old.shape[1],:,:],outputs_synthetic_old)
+                    ldi = self.mse_logit(outputs_synthetic[:,:outputs_synthetic_old.shape[1],:,:],outputs_synthetic_old)
                     
                 # xxx first backprop of previous loss (compute the gradients for regularization methods)
-                loss_tot = loss + loss1 + loss2 + lkd + lde + kl
+                loss_tot = loss + loss1 + loss2 + lkd + lde + ldi
                 loss_tot = loss_tot.mean()
 
             self.scaler.scale(loss_tot).backward()
@@ -205,18 +196,11 @@ class Trainer:
                 outputs, cx1_sup, cx2_sup = model(images, ret_intermediate=True)
                 features = self.model.features
 
-                # xxx BCE / Cross Entropy Loss
-                #if not self.icarl_only_dist:
                 loss = criterion(outputs, labels)  # B x H x W
-                #else:
-                #    loss = self.licarl(outputs, labels, torch.sigmoid(outputs_old))
-
                 loss = loss.mean()  # scalar
 
-                # xxx ILTSS (distillation on features or logits)
-                # loss calcolate su cx1, cx2 ?? ? ?? ? ? 
-
                 # with batch_size = 16, the last batch had 5 samples in features and 16 in features_old
+                # hence, we skipped this scenario
                 if self.lde_flag and self.model_old and features.size()[0] == features_old.size()[0]:
                     lde = self.lde_loss(features, features_old)
 
@@ -242,13 +226,10 @@ class Trainer:
                                         labels[0],
                                         prediction[0]))
 
-            # collect statistics from multiple processes
-            # metrics.synch(device)
             score = metrics.get_results()
 
             class_loss = torch.tensor(class_loss).to(self.device)
             reg_loss = torch.tensor(reg_loss).to(self.device)
-
 
             if logger is not None:
                 logger.info(f"Validation, Class Loss={class_loss}, Reg Loss={reg_loss} (without scaling)")
