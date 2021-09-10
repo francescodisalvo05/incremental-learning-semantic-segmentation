@@ -10,7 +10,7 @@ import random
 import torch
 from torch.utils import data
 
-from dataset import VOCSegmentationIncremental, AdeSegmentationIncremental, CustomVOCSegmentation
+from dataset import VOCSegmentationIncremental, AdeSegmentationIncremental
 from dataset import transform
 from metrics import StreamSegMetrics
 from segmentation_module_BiSeNet import make_model
