@@ -4,18 +4,15 @@ import os
 from utils.logger import Logger
 
 from torch import cuda
-from torch.utils.data.distributed import DistributedSampler
 
 import numpy as np
 import random
 import torch
 from torch.utils import data
-from torch import distributed
 
 from dataset import VOCSegmentationIncremental, AdeSegmentationIncremental, CustomVOCSegmentation
 from dataset import transform
 from metrics import StreamSegMetrics
-from torch.cuda import amp
 from segmentation_module_BiSeNet import make_model
 
 from train import Trainer
@@ -66,9 +63,6 @@ def get_dataset(opts):
 
     labels, labels_old, path_base = tasks.get_task_labels(opts.dataset, opts.task, opts.step)
     labels_cum = labels_old + labels
-
-    # extract DeepInversion images
-    deepinv_dataset = CustomVOCSegmentation
 
     if opts.dataset == 'voc':
         dataset = VOCSegmentationIncremental
@@ -144,7 +138,6 @@ def main(opts):
 
     logger.info(f"Dataset: {opts.dataset}, Train set: {len(train_dst)}, Val set: {len(val_dst)},"
                 f" Test set: {len(test_dst)}, n_classes {n_classes}")
-    # logger.info(f"Total batch size is {opts.batch_size * world_size}")
 
     # xxx Set up model
     logger.info(f"Backbone: {opts.backbone}")
@@ -163,15 +156,6 @@ def main(opts):
 
     logger.debug(model)
 
-    # xxx Set up optimizer
-    """
-    params = []
-    params.append({"params": filter(lambda p: p.requires_grad, model.head.parameters()),
-                   'weight_decay': opts.weight_decay})
-
-    params.append({"params": filter(lambda p: p.requires_grad, model.cls.parameters()),
-                   'weight_decay': opts.weight_decay})
-    """
     optimizer = torch.optim.SGD(model.parameters(), lr=opts.lr, momentum=0.9, nesterov=True)
 
     if opts.lr_policy == 'poly':
@@ -181,15 +165,6 @@ def main(opts):
     else:
         raise NotImplementedError
     logger.debug("Optimizer:\n%s" % optimizer)
-
-    """
-    if model_old is not None:
-        [model, model_old], optimizer = amp.initialize([model.to(device), model_old.to(device)], optimizer,
-                                                       opt_level=opts.opt_level)
-        model_old = model_old.cuda(device)
-    else:
-        model, optimizer = amp.initialize(model.to(device), optimizer, opt_level=opts.opt_level)
-    """
     
     # Put the model on GPU
     model = model.cuda(device)
