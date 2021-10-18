@@ -4,6 +4,23 @@
 
 * You can find our report [`here`](https://github.com/francescodisalvo05/incremental-learning-semantic-segmentation/blob/main/Di_Salvo_La_Malfa_Lacriola_Report.pdf). 
 
+---
+
+## Run the code
+Other than the [arguments](https://github.com/fcdl94/MiB) proposed by the author of MiB (the incremental baseline), we have introduced:
+
+* --deepinversion_images : directory of synthetic images generated through [DeepInversion](https://github.com/francescodisalvo05/DeepInversion) (Only for step > 0)
+
+```
+!python run.py --deepinversion_images='..' --data_root='..' --step_ckpt='..' --backbone='resnet50' --task='15-5' --step=1 --batch_size=16 --crop_size=512 --lr=1e-2 --epochs=20
+```
+
+## Generated Images
+Below you can see the synthetic images of the classes: cow, person, dog and bus. Considering our computational limitations (running on Google Colab), they can be considered quite satisfactory.
+
+<p align="center">
+  <img src="sample_deepinv.png" />
+</p>
 
 ### Main references:
 * Modeling the Background protocol, by Cermelli at al [(paper](https://arxiv.org/abs/2002.00718), [code)](https://github.com/fcdl94/MiB)
